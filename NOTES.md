@@ -80,3 +80,37 @@ so two runs are byte-identical.
 - Payout wallet if the entry wins: the user's own Phantom wallet
   J5RWarhndcDzsRBdd32aBodKRDZPR2hsErZpL7i7dtrw — NOT the Muse keypair
   cCZu4ADdLdypT4rVw88jdWfUkoj6318bkaNtxiT6DRM.
+
+## REJECTED by grader, then fixed (2026-11-21 ~00:25 WIB)
+
+- Submitted 20 Nov 17:24 WIB (claim AF-4K3EE-G384Z-A2FXY-XNYNK, commit
+  a55fe6b5). Site: "One check failed, so this entry was not scored.
+  Grading run, failed. The latest grade run on the dev phase ended failed:
+  the program exited with code 1." 24 other checks passed. Resubmit
+  deadline 21 Nov 07:00 WIB.
+- Root cause (proven by re-running in a clean env): `main.py` imported
+  Pillow (`from PIL import ...`), but the grader runs
+  `python3 -P -s /bot/main.py` in python:3.13-slim, standard library only
+  — Pillow is not installed. Reproduced: `ModuleNotFoundError: No module
+  named 'PIL'`, exit code 1, in a venv without PIL. Second latent bug:
+  the old program wrote `output.png` in the cwd, but /bot is read-only
+  and the grader reads `/output/entry.png`.
+- Fix (2026-11-21 ~00:30 WIB): `main.py` rewritten as a stdlib-only
+  copy program — it copies the pre-rendered `output.png` (committed in
+  the repo next to main.py) to `$MAKEFUN_OUTPUT_DIR/entry.png`, default
+  `/output/entry.png`. This is the pattern the competition rules
+  themselves suggest ("the simplest entry is a repository holding the
+  image and a one-line program that copies it there"). No drawing at
+  runtime, no network, no third-party imports.
+- Verification (clean env, /bot read-only, venv without PIL,
+  PYTHONHASHSEED=0, `python3 -P -s`): 3 runs, all exit 0 — twice with
+  MAKEFUN_OUTPUT_DIR set, once with the default /output path. All three
+  outputs byte-identical to the original verified render, SHA-256
+  7398a4687268d58bec3e5186a6aef8f5cb962f4db320042528f8240d096456c5.
+  PNG valid, 1024x1024, 121,671 bytes (≤1 MiB). Image content unchanged
+  (same file): six stories — ICJ Myanmar; Trump/Xi/Putin Shenzhen;
+  Hormuz; COP31 Antalya; EU EUR 45bn Ukraine; Senegal.
+- IMPORTANT for the resubmit commit: `output.png` was NEVER committed —
+  it is untracked in the local repo and absent from commit a55fe6b5. The
+  fix commit MUST include `output.png` together with the new `main.py`,
+  or the copy will fail with "output.png not found" in the grader.
